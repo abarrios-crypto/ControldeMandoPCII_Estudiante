@@ -1,0 +1,1623 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DreamLAB: Seguimiento de Patología Clínica II</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --kirby-pink: #f8b4d8;
+            --kirby-blue: #a0e8f0;
+            --kirby-green: #98fb98;
+            --kirby-purple: #d8b4fe;
+            --kirby-dark-text: #5c5470;
+            --kirby-light-text: #6b7280;
+            --bubblegum-pink: #F571A3;
+            --cheerful-yellow: #FBBF24;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FEF6FA; /* Rosa muy suave */
+            color: var(--kirby-dark-text);
+        }
+        h1, h2, h3, .font-kirby {
+            font-family: 'Fredoka One', cursive;
+            color: var(--bubblegum-pink);
+            text-shadow: -1.5px -1.5px 0 #fff, 1.5px -1.5px 0 #fff, -1.5px 1.5px 0 #fff, 1.5px 1.5px 0 #fff;
+            filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.8)); /* Efecto luminoso */
+        }
+        .title-stars {
+             color: var(--cheerful-yellow);
+        }
+        .tab-button {
+            transition: opacity 0.2s ease-in-out;
+        }
+        .tab-button:hover {
+            opacity: 0.7;
+        }
+        .tab-button.active {
+            border-bottom-color: var(--bubblegum-pink);
+            opacity: 1;
+        }
+        .card {
+            background-color: white;
+            border-radius: 2rem; /* More rounded */
+            border: 3px solid #e5e7eb;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.05);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-8px) rotate(1deg);
+            box-shadow: 0 12px 24px rgba(236, 72, 153, 0.1);
+        }
+        .progress-bar-container {
+            background-color: #e5e7eb;
+            border-radius: 9999px;
+            overflow: hidden;
+            height: 1.5rem;
+            border: 3px solid #e5e7eb;
+        }
+        .progress-bar {
+            background: linear-gradient(to right, var(--kirby-blue), var(--kirby-pink));
+        }
+        .dream-checkbox:checked {
+            background-color: var(--kirby-pink);
+            border-color: #e782b6;
+        }
+        /* Kirby-style button */
+        .kirby-button {
+            border-radius: 9999px;
+            font-family: 'Fredoka One', cursive;
+            padding: 0.75rem 1.5rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 0 #c084fc;
+            text-transform: uppercase;
+            text-shadow: none; /* Remove outline from buttons */
+        }
+        .kirby-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 0 #a855f7;
+        }
+        .kirby-button:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 #a855f7;
+        }
+
+        /* Modal styles */
+        .modal-backdrop {
+            background-color: rgba(254, 246, 250, 0.7);
+            transition: opacity 0.3s ease;
+        }
+        .modal-content {
+            transition: transform 0.3s ease;
+            border-radius: 2rem;
+            border: 3px solid #e5e7eb;
+        }
+        /* Custom scrollbar for webkit browsers */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #FEF6FA;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--kirby-pink);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #e782b6;
+        }
+        .task-list-item input:checked + span {
+            text-decoration: line-through;
+            color: #9ca3af;
+        }
+
+        /* --- ANIMATIONS --- */
+        @keyframes pulseStar {
+            0%, 100% {
+                transform: scale(1);
+                filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.7));
+            }
+            50% {
+                transform: scale(1.1);
+                filter: drop-shadow(0 0 16px rgba(251, 191, 36, 1));
+            }
+        }
+        .animated-star {
+            animation: pulseStar 3s ease-in-out infinite;
+        }
+
+        @keyframes floatStar {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-4px);
+            }
+        }
+        .floating-star {
+            color: var(--cheerful-yellow);
+            filter: drop-shadow(0 0 5px rgba(251, 191, 36, 0.5));
+            animation: floatStar 2.5s ease-in-out infinite;
+        }
+
+        #star-path-line {
+            position: absolute;
+            left: 1.5rem; 
+            top: 2rem;
+            bottom: 2rem;
+            width: 4px;
+            background-image: linear-gradient(var(--kirby-purple) 40%, transparent 0%);
+            background-size: 4px 15px;
+            opacity: 0.5;
+        }
+        #traveling-star-path {
+            position: absolute;
+            left: 0.65rem; 
+            top: 0;
+            transition: top 1.2s cubic-bezier(0.65, 0, 0.35, 1); /* Smooth ease-in-out */
+            z-index: 10;
+        }
+
+        /* Image Viewer Zoom */
+        #report-viewer-img-container {
+            cursor: grab;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+        }
+        #report-viewer-img-container.grabbing {
+            cursor: grabbing;
+        }
+        #report-viewer-image {
+            transition: transform 0.2s ease;
+            transform-origin: center center;
+        }
+
+    </style>
+</head>
+<body class="antialiased">
+
+    <!-- Header -->
+    <header class="bg-white shadow-md sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+            <h1 class="text-2xl font-extrabold">DreamLAB: Patología Clínica II</h1>
+            <div class="hidden md:flex items-center space-x-2">
+                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-300" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                <span id="total-stars-header" class="text-lg font-bold text-gray-700 font-kirby" style="text-shadow: none; color: #5c5470; filter: none;">0</span>
+                <span class="text-sm text-gray-500" style="text-shadow: none; filter: none;">Estrellas</span>
+            </div>
+        </div>
+        <!-- Navigation Tabs -->
+        <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex border-b border-gray-200">
+                <button onclick="switchTab('inicio')" class="tab-button active text-sm sm:text-base font-semibold py-4 px-2 sm:px-6 font-kirby">Inicio</button>
+                <button onclick="switchTab('programa')" class="tab-button text-sm sm:text-base font-semibold py-4 px-2 sm:px-6 font-kirby">Programa</button>
+                <button onclick="switchTab('practicas')" class="tab-button text-sm sm:text-base font-semibold py-4 px-2 sm:px-6 font-kirby">Prácticas</button>
+                <button onclick="switchTab('examenes')" class="tab-button text-sm sm:text-base font-semibold py-4 px-2 sm:px-6 font-kirby">Exámenes</button>
+                <button onclick="switchTab('misiones')" class="tab-button text-sm sm:text-base font-semibold py-4 px-2 sm:px-6 font-kirby">Misiones</button>
+                <button onclick="switchTab('progreso')" class="tab-button text-sm sm:text-base font-semibold py-4 px-2 sm:px-6 font-kirby">Mi Progreso</button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+        <!-- Inicio Tab -->
+        <div id="inicio" class="tab-content">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Welcome Card -->
+                <div class="md:col-span-2 card p-8">
+                    <h2 class="text-3xl font-bold">¡Bienvenido a tu aventura en Patología Clínica II!</h2>
+                    <p class="mt-4 text-kirby-light-text">Esta es tu central de mando. Usa esta herramienta para conquistar la materia. No olvides escribir tu nombre para generar tus comprobantes.</p>
+                     <div class="mt-4">
+                        <label class="block text-sm font-medium text-kirby-dark-text">Nombre del Estudiante:</label>
+                        <div id="student-name-display-container" class="mt-1 flex items-center gap-4 hidden">
+                            <p id="student-name-text" class="text-lg font-bold" style="text-shadow: none; filter: none; color: var(--kirby-dark-text);"></p>
+                            <button onclick="editStudentName()" class="text-xs bg-gray-200 text-gray-600 px-3 py-1 rounded-full hover:bg-gray-300">Editar</button>
+                        </div>
+                        <div id="student-name-edit-container" class="hidden mt-1 flex items-center gap-4">
+                            <input type="text" id="student-name-input" placeholder="Escribe tu nombre completo aquí..." class="block w-full rounded-full border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500">
+                            <button onclick="saveStudentName()" class="bg-purple-400 text-white kirby-button !p-2 !px-4">Guardar</button>
+                        </div>
+                    </div>
+                </div>
+                <!-- Stars Card -->
+                <div class="card p-8 flex flex-col items-center justify-center bg-yellow-50 border-yellow-200">
+                    <h3 class="text-lg font-bold font-kirby title-stars">Estrellas de Crédito</h3>
+                     <svg xmlns="http://www.w3.org/2000/svg" class="h-20 w-20 text-yellow-300 my-4 animated-star" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                    <p class="text-5xl font-extrabold text-yellow-500 font-kirby" id="total-stars-dashboard" style="text-shadow: none; color: #f59e0b; filter: none;">0</p>
+                </div>
+                <!-- Progress Card -->
+                <div class="md:col-span-3 card p-8">
+                    <h3 class="text-xl font-bold font-kirby mb-4">Avance General del Programa</h3>
+                    <div class="progress-bar-container">
+                        <div id="global-progress-bar" class="progress-bar h-full text-center text-white font-bold" style="width: 0%;"></div>
+                    </div>
+                    <p id="global-progress-text" class="text-right mt-2 font-semibold" style="text-shadow: none; color: #5c5470; filter: none;">0% completado</p>
+                </div>
+                <!-- Upcoming Missions -->
+                 <div class="md:col-span-3 card p-8">
+                    <h3 class="text-xl font-bold font-kirby mb-4">Próximas Misiones</h3>
+                    <div id="upcoming-missions-container" class="space-y-4">
+                        <p class="text-kirby-light-text">No tienes misiones pendientes. ¡Planifica una nueva en la pestaña "Misiones"!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Programa Tab -->
+        <div id="programa" class="tab-content hidden">
+            <h2 class="text-3xl font-bold font-kirby mb-6">Avance Programático</h2>
+            <div id="syllabus-wrapper" class="relative">
+                <!-- Star and path will be injected here by JS -->
+                <div id="syllabus-container" class="space-y-4">
+                    <!-- Syllabus content will be injected here by JS -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Prácticas Tab -->
+        <div id="practicas" class="tab-content hidden">
+            <h2 class="text-3xl font-bold font-kirby mb-6">Prácticas de Laboratorio</h2>
+            <p class="mb-8 text-kirby-light-text max-w-3xl">Completa cada práctica, sube las fotos de tu reporte y registra el nivel alcanzado para validarlo con tu docente.</p>
+            <div id="lab-practices-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                <!-- Lab practices content will be injected here by JS -->
+            </div>
+        </div>
+
+        <!-- Exámenes Tab -->
+        <div id="examenes" class="tab-content hidden">
+            <h2 class="text-3xl font-bold font-kirby mb-6">Exámenes Teóricos</h2>
+            <p class="mb-8 text-kirby-light-text max-w-3xl">Ingresa la calificación de cada examen, sube una foto como evidencia y valídalo con tu docente para generar tu comprobante.</p>
+            <div id="exams-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                <!-- Exam cards will be injected here by JS -->
+            </div>
+        </div>
+
+        <!-- Misiones (Estrellas) Tab -->
+        <div id="misiones" class="tab-content hidden">
+             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                <!-- Mission Planner -->
+                <div class="card p-8 lg:sticky top-28">
+                    <h2 class="text-2xl font-bold mb-4 font-kirby">Planificador de Misiones</h2>
+                    <form id="mission-form" class="space-y-4">
+                        <div>
+                            <label for="mission-select" class="block text-sm font-medium">Elige una Misión</label>
+                            <select id="mission-select" class="mt-1 block w-full rounded-full border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500"></select>
+                        </div>
+                         <div id="custom-mission-container" class="hidden">
+                            <label for="mission-custom-desc" class="block text-sm font-medium">Descripción Personalizada</label>
+                            <input type="text" id="mission-custom-desc" class="mt-1 block w-full rounded-full border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500">
+                        </div>
+                        <div>
+                            <label for="mission-objective" class="block text-sm font-medium">🎯 Objetivo Principal</label>
+                            <textarea id="mission-objective" rows="2" placeholder="¿Cuál es la meta final de esta misión?" class="mt-1 block w-full rounded-2xl border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500"></textarea>
+                        </div>
+                        <div>
+                            <label for="mission-steps" class="block text-sm font-medium">📝 Pasos Clave</label>
+                            <textarea id="mission-steps" rows="4" placeholder="Enumera los pasos o tareas para completar la misión. Ej: 1. Investigar... 2. Crear borrador... 3. Diseñar slides..." class="mt-1 block w-full rounded-2xl border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500"></textarea>
+                        </div>
+                         <div>
+                            <label for="mission-resources" class="block text-sm font-medium">📚 Recursos Necesarios</label>
+                            <textarea id="mission-resources" rows="2" placeholder="¿Qué necesitas? Ej: Acceso a journals, software de presentación, etc." class="mt-1 block w-full rounded-2xl border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500"></textarea>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="mission-stars" class="block text-sm font-medium">🌟 Estrellas</label>
+                                <input type="number" id="mission-stars" min="1" required class="mt-1 block w-full rounded-full border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500">
+                            </div>
+                            <div>
+                                <label for="mission-due-date" class="block text-sm font-medium">📅 Fecha Límite</label>
+                                <input type="date" id="mission-due-date" required class="mt-1 block w-full rounded-full border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500">
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full bg-purple-500 text-white kirby-button">¡Añadir Misión!</button>
+                    </form>
+                </div>
+
+                <!-- Mission Lists -->
+                <div class="space-y-8">
+                    <div>
+                        <h3 class="text-xl font-bold mb-4 font-kirby">Misiones Pendientes</h3>
+                        <div id="pending-missions-list" class="space-y-4">
+                           <!-- Injected by JS -->
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold mb-4 font-kirby">Misiones Completadas</h3>
+                        <div id="completed-missions-list" class="space-y-4 opacity-70">
+                           <!-- Injected by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Progreso Tab -->
+        <div id="progreso" class="tab-content hidden">
+            <h2 class="text-3xl font-bold mb-6 font-kirby">Resumen de Progreso</h2>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="card p-8">
+                    <h3 class="text-xl font-bold text-center mb-4 font-kirby">Avance por Unidad</h3>
+                     <div class="h-96 w-full flex items-center justify-center">
+                        <canvas id="progressChart"></canvas>
+                    </div>
+                </div>
+                 <div class="card p-8">
+                    <h3 class="text-xl font-bold text-center mb-4 font-kirby">Desglose de Temas</h3>
+                     <div class="h-96 w-full flex items-center justify-center">
+                        <canvas id="topicsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Star Vault Section -->
+            <div class="mt-12">
+                <h2 class="text-3xl font-bold mb-6 flex items-center font-kirby">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-yellow-300 mr-3" viewBox="0 0 20 20" fill="currentColor" style="filter: drop-shadow(0 0 3px white);"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                    Bóveda de Estrellas
+                </h2>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Vault Entry Form & Log -->
+                    <div class="lg:col-span-2 card p-8">
+                        <h3 class="text-xl font-bold mb-4 font-kirby">Registrar Estrellas Obtenidas</h3>
+                        <form id="star-vault-form" class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                            <div class="sm:col-span-2">
+                                <label for="vault-activity" class="block text-sm font-medium">Nombre de la Actividad</label>
+                                <input type="text" id="vault-activity" required class="mt-1 block w-full rounded-full border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500">
+                            </div>
+                            <div>
+                                <label for="vault-stars" class="block text-sm font-medium">Estrellas</label>
+                                <input type="number" id="vault-stars" min="1" required class="mt-1 block w-full rounded-full border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500">
+                            </div>
+                            <div class="sm:col-span-3 flex justify-end">
+                                <button type="submit" class="bg-purple-500 text-white kirby-button">Añadir a Bóveda</button>
+                            </div>
+                        </form>
+                        <hr class="my-8 border-gray-200">
+                        <h3 class="text-xl font-bold mb-4 font-kirby">Historial de la Bóveda</h3>
+                        <div id="star-vault-log" class="space-y-3 max-h-60 overflow-y-auto pr-2">
+                           <!-- Injected by JS -->
+                        </div>
+                    </div>
+                    <!-- Converter and Summary -->
+                    <div class="space-y-8">
+                        <div class="card p-8">
+                            <h3 class="text-xl font-bold mb-4 font-kirby">Convertidor a Puntos Corazón</h3>
+                            <label for="star-converter-input" class="block text-sm font-medium">Estrellas de Crédito (EC)</label>
+                            <input type="number" id="star-converter-input" min="0" placeholder="100" class="mt-1 block w-full rounded-full border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500">
+                            <div class="mt-4 text-center">
+                                <span class="text-2xl font-bold" id="heart-points-output" style="text-shadow: none; color: #5c5470; filter: none;">5.0 PC</span>
+                                <p class="text-xs text-gray-500">Equivalencia: 100 EC = 5 PC</p>
+                            </div>
+                        </div>
+                        <div class="card p-8 bg-pink-50 border-pink-200">
+                            <h3 class="text-xl font-bold mb-4 font-kirby">Resumen de Bóveda</h3>
+                            <div class="space-y-3">
+                                <div class="flex justify-between items-baseline">
+                                    <span class="text-gray-600">Total en Bóveda:</span>
+                                    <span id="vault-total-stars" class="font-bold text-2xl" style="text-shadow: none; color: #ec4899; filter: none;">0 EC</span>
+                                </div>
+                                <div class="flex justify-between items-baseline">
+                                    <span class="text-gray-600">Próximo paquete:</span>
+                                    <span id="vault-next-package" class="font-bold text-lg" style="text-shadow: none; color: #5c5470; filter: none;">Faltan 100</span>
+                                </div>
+                                <div class="flex justify-between items-baseline">
+                                    <span class="text-gray-600">Sobrante actual:</span>
+                                    <span id="vault-remaining-stars" class="font-bold text-lg" style="text-shadow: none; color: #5c5470; filter: none;">0 EC</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Notes Modal -->
+    <div id="notes-modal" class="fixed inset-0 z-50 flex items-center justify-center modal-backdrop hidden opacity-0">
+        <div class="modal-content card p-8 w-11/12 md:max-w-2xl transform scale-95">
+            <div class="flex justify-between items-center">
+                <h2 id="notes-modal-title" class="text-2xl font-bold font-kirby">Notas</h2>
+                <button onclick="closeNotesModal()" class="text-gray-500 hover:text-gray-800 text-3xl font-bold" style="text-shadow: none; filter: none;">&times;</button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                <!-- Notes Text Area -->
+                <div>
+                    <h3 class="text-lg font-kirby mb-2">Apuntes del Tema</h3>
+                    <textarea id="notes-textarea" class="w-full h-64 border border-gray-300 rounded-2xl p-4 focus:ring-pink-500 focus:border-pink-500" placeholder="Escribe tus notas aquí..."></textarea>
+                </div>
+                <!-- Associated Tasks -->
+                <div>
+                     <h3 class="text-lg font-kirby mb-2">Tareas Asociadas</h3>
+                     <div class="bg-gray-50 p-4 rounded-2xl h-64 flex flex-col">
+                        <div id="task-list" class="flex-grow space-y-2 overflow-y-auto pr-2">
+                           <!-- Tasks injected here -->
+                        </div>
+                        <form id="task-form" class="mt-4 flex gap-2">
+                            <input type="text" id="task-input" placeholder="Añadir nueva tarea..." class="flex-grow w-full rounded-full border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500 text-sm">
+                            <button type="submit" class="bg-pink-400 text-white rounded-full p-2 hover:bg-pink-500 transition-colors flex-shrink-0">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                            </button>
+                        </form>
+                     </div>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-between items-center">
+                <div>
+                    <button onclick="deleteNote()" id="delete-note-btn" class="text-red-500 text-sm hover:underline">Eliminar Nota</button>
+                </div>
+                <div class="flex space-x-4">
+                     <button onclick="downloadNotePDF()" class="bg-gray-200 text-gray-800 font-bold py-2 px-6 rounded-full hover:bg-gray-300 transition-colors">Descargar PDF</button>
+                    <button onclick="saveNote()" class="bg-purple-500 text-white kirby-button">Guardar y Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report Viewer Modal -->
+    <div id="report-viewer-modal" class="fixed inset-0 z-50 flex items-center justify-center modal-backdrop hidden opacity-0">
+        <div class="modal-content card p-4 w-11/12 max-w-4xl max-h-[90vh] flex flex-col transform scale-95">
+            <div class="flex justify-between items-center mb-2 flex-shrink-0">
+                <h2 id="report-viewer-title" class="text-xl font-bold font-kirby">Visor de Reporte</h2>
+                <button onclick="closeReportViewer()" class="text-gray-500 hover:text-gray-800 text-3xl font-bold" style="text-shadow: none; filter: none;">&times;</button>
+            </div>
+            <div id="report-viewer-img-container" class="flex-grow relative flex items-center justify-center bg-gray-100 rounded-2xl">
+                 <img id="report-viewer-image" src="" class="max-w-full max-h-full object-contain">
+            </div>
+            <div class="flex justify-between items-center mt-2 flex-shrink-0">
+                 <button id="report-viewer-prev" class="bg-purple-400 text-white kirby-button !p-2 !px-4">&lt; Anterior</button>
+                 <div class="flex items-center gap-2">
+                    <button id="report-viewer-zoom-out" class="bg-gray-200 text-gray-700 rounded-full p-2 hover:bg-gray-300">-</button>
+                    <button id="report-viewer-zoom-reset" class="bg-gray-200 text-gray-700 rounded-full p-2 hover:bg-gray-300">Reset</button>
+                    <button id="report-viewer-zoom-in" class="bg-gray-200 text-gray-700 rounded-full p-2 hover:bg-gray-300">+</button>
+                 </div>
+                 <span id="report-viewer-counter" class="font-bold text-sm text-kirby-dark-text"></span>
+                 <button id="report-viewer-next" class="bg-purple-400 text-white kirby-button !p-2 !px-4">Siguiente &gt;</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // --- DATA ---
+        const { jsPDF } = window.jspdf;
+        const TEACHER_PASSWORD = "Sofi.22012016"; // Contraseña para validar nivel
+        const optionalMissions = [
+            { id: 'om1', text: 'Presentación de un Tema (Tesoro de Innovación)' },
+            { id: 'om2', text: 'Propuesta de un Debate (Tesoro de Iniciativa)' },
+            { id: 'om3', text: 'Asistencia a Eventos (Tesoro de Exploración)' },
+            { id: 'om4', text: 'Contribución Sociocultural (Tesoro de Conexión Humana)' }
+        ];
+
+        const labPractices = [
+            { id: 'lp1', name: 'Determinación de hematocrito' },
+            { id: 'lp2', name: 'Conteo de glóbulos rojos' },
+            { id: 'lp3', name: 'Conteo de glóbulos blancos' },
+            { id: 'lp4', name: 'Conteo de plaquetas' },
+            { id: 'lp5', name: 'Extendido sanguíneo (frotis)' },
+            { id: 'lp6', name: 'Diferencial leucocitario' },
+            { id: 'lp7', name: 'Determinación de grupo sanguíneo' }
+        ];
+
+        const practiceLevels = ['Bio-Aprendiz', 'Bio-Técnico', 'Bio-Maestro', 'Bio-Héroe'];
+
+        const syllabus = [
+            { id: 'u1', title: 'Unidad 1: Introducción a la Patología Clínica II', topics: [
+                { id: 'u1t1', text: 'Alcance de la patología clínica en la biomedicina' },
+                { id: 'u1t2', text: 'Aplicaciones prácticas de la etiología y factores de riesgo' },
+                { id: 'u1t3', text: 'Patogénesis: fundamentos lesionales y fisiopatológicos' },
+                { id: 'u1t4', text: 'Conceptos de síntoma, signo, síndrome y otros' },
+                { id: 'u1t5', text: 'Medicina basada en la evidencia' }
+            ]},
+            { id: 'u2', title: 'Unidad 2: Estudio Básico de la Sangre', topics: [
+                { id: 'u2t1', text: 'Composición de la sangre' },
+                { id: 'u2t2', text: 'Hematopoyesis y funciones de los diferentes tipos celulares' },
+                { id: 'u2t3', text: 'Alteraciones hematológicas más comunes' },
+                { id: 'u2t4', text: 'Interpretación de los resultados de un hemograma' },
+                { id: 'u2t5', text: 'Pruebas específicas en hematología' }
+            ]},
+            { id: 'u3', title: 'Unidad 3: Banco de Sangre y Medicina Transfusional', topics: [
+                { id: 'u3t1', text: 'Principios de la donación de sangre' },
+                { id: 'u3t2', text: 'Tipos de transfusiones y sus indicaciones' },
+                { id: 'u3t3', text: 'Reacciones transfusionales' },
+                { id: 'u3t4', text: 'Conservación y manejo de hemoderivados' },
+                { id: 'u3t5', text: 'Tendencias en investigación en la Medicina Tranfusional' }
+            ]},
+            { id: 'u4', title: 'Unidad 4: Valoración Metabólica Básica', topics: [
+                { id: 'u4t1', text: 'Puntos claves del metabolismo de carbohidratos, lípidos y proteínas' },
+                { id: 'u4t2', text: 'Marcadores bioquímicos' },
+                { id: 'u4t3', text: 'Interpretación de perfiles metabólicos' }
+            ]},
+            { id: 'u5', title: 'Unidad 5: Valoración Renal Básica', topics: [
+                { id: 'u5t1', text: 'Fisiología renal básica' },
+                { id: 'u5t2', text: 'Alteraciones renales y marcadores de función renal' },
+                { id: 'u5t3', text: 'Enfermedades renales más frecuentes' }
+            ]},
+            { id: 'u6', title: 'Unidad 6: Valoración Hepática Básica', topics: [
+                { id: 'u6t1', text: 'Fisiología hepática básica' },
+                { id: 'u6t2', text: 'Pruebas hepáticas y su interpretación' },
+                { id: 'u6t3', text: 'Hepatopatías más comunes' }
+            ]},
+            { id: 'u7', title: 'Unidad 7: Evaluación del Equilibrio Ácido-Base', topics: [
+                { id: 'u7t1', text: 'Fisiología ácido-base' },
+                { id: 'u7t2', text: 'Acidosis y alcalosis' },
+                { id: 'u7t3', text: 'Interpretación de gases arteriales' }
+            ]}
+        ];
+
+        let appData = {
+            studentName: '',
+            progress: {},
+            notes: {},
+            missions: [],
+            starVault: [],
+            labStamps: {},
+            labReports: {},
+            labLevels: {},
+            examData: {}
+        };
+        
+        let currentNoteTopicId = null;
+        let currentNoteTopicText = '';
+        let progressChartInstance = null;
+        let topicsChartInstance = null;
+        
+        let currentReportPracticeId = null;
+        let currentReportImageIndex = 0;
+        let zoomLevel = 1;
+        let isPanning = false;
+        let startPan = { x: 0, y: 0 };
+        let startImgPos = { x: 0, y: 0 };
+
+
+        // --- DATA PERSISTENCE ---
+        function saveData() {
+            localStorage.setItem('dreamlabPatoTrackerData', JSON.stringify(appData));
+        }
+
+        function loadData() {
+            const data = localStorage.getItem('dreamlabPatoTrackerData');
+            if (data) {
+                appData = JSON.parse(data);
+                if (!appData.studentName) appData.studentName = '';
+                if (!appData.progress) appData.progress = {};
+                if (!appData.notes) appData.notes = {};
+                if (!appData.missions) appData.missions = [];
+                if (!appData.starVault) appData.starVault = [];
+                if (!appData.labStamps) appData.labStamps = {};
+                if (!appData.labReports) appData.labReports = {};
+                if (!appData.labLevels) appData.labLevels = {};
+                if (!appData.examData) appData.examData = {};
+            }
+        }
+        
+        // --- TABS ---
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+            document.querySelectorAll('.tab-button').forEach(button => button.classList.remove('active'));
+            document.getElementById(tabId).classList.remove('hidden');
+            document.querySelector(`.tab-button[onclick="switchTab('${tabId}')"]`).classList.add('active');
+            if (tabId === 'progreso') {
+                updateCharts();
+            }
+        }
+
+        // --- SYLLABUS & PROGRESS ---
+        function renderSyllabus() {
+            const container = document.getElementById('syllabus-container');
+            container.innerHTML = '';
+            syllabus.forEach(unit => {
+                const unitCard = document.createElement('div');
+                unitCard.className = 'card p-6';
+
+                const totalTopics = unit.topics.length;
+                const completedTopics = unit.topics.filter(topic => appData.progress[topic.id]).length;
+                const unitPercentage = totalTopics > 0 ? (completedTopics / totalTopics) * 100 : 0;
+
+                let topicsHTML = unit.topics.map(topic => {
+                    const hasNote = appData.notes[topic.id] && (appData.notes[topic.id].text || (appData.notes[topic.id].tasks && appData.notes[topic.id].tasks.length > 0));
+                    return `
+                    <div class="flex items-center justify-between p-3 rounded-2xl hover:bg-pink-50">
+                        <label for="${topic.id}" class="flex items-center cursor-pointer flex-grow">
+                            <input id="${topic.id}" type="checkbox" onchange="toggleTopic('${topic.id}')" class="dream-checkbox" ${appData.progress[topic.id] ? 'checked' : ''}>
+                            <span class="ml-4 ${appData.progress[topic.id] ? 'line-through text-gray-400' : ''}">${topic.text}</span>
+                        </label>
+                        <button onclick="openNotesModal('${topic.id}', '${topic.text.replace(/'/g, "\\'")}')" class="ml-4 text-sm font-medium ${hasNote ? 'text-purple-600 hover:text-purple-800' : 'text-gray-400 hover:text-gray-600'}">
+                            ${hasNote ? 'Ver/Editar Nota' : 'Añadir Nota'}
+                        </button>
+                    </div>
+                `}).join('');
+
+                unitCard.innerHTML = `
+                    <h3 class="text-xl font-bold font-kirby mb-4" style="padding-left: 2.5rem;">${unit.title}</h3>
+                    <div class="progress-bar-container mb-4">
+                        <div class="progress-bar h-full" style="width: ${unitPercentage}%;"></div>
+                    </div>
+                    <div class="space-y-2">
+                        ${topicsHTML}
+                    </div>
+                `;
+                container.appendChild(unitCard);
+            });
+        }
+
+        function toggleTopic(topicId) {
+            appData.progress[topicId] = !appData.progress[topicId];
+            saveData();
+            updateAll();
+        }
+
+        function updateTravelingStarPosition() {
+            const syllabusContainer = document.getElementById('syllabus-container');
+            const star = document.getElementById('traveling-star-path');
+
+            if (!syllabusContainer || !star || syllabusContainer.offsetHeight === 0) {
+                 setTimeout(updateTravelingStarPosition, 100);
+                 return;
+            }
+
+            const totalTopics = syllabus.reduce((acc, unit) => acc + unit.topics.length, 0);
+            const completedTopics = Object.values(appData.progress).filter(Boolean).length;
+            
+            let percentage = totalTopics > 0 ? (completedTopics / totalTopics) : 0;
+            
+            const containerHeight = syllabusContainer.offsetHeight;
+            const starHeight = star.offsetHeight;
+            const maxTop = containerHeight - starHeight;
+
+            let newTop = percentage * maxTop;
+            
+            // Ensure star doesn't go beyond the very beginning or end
+            if (newTop < 0) newTop = 0;
+            if (newTop > maxTop) newTop = maxTop;
+
+            star.style.top = `${newTop}px`;
+        }
+
+        // --- NOTES MODAL & TASKS ---
+        function openNotesModal(topicId, topicText) {
+            currentNoteTopicId = topicId;
+            currentNoteTopicText = topicText;
+
+            if (!appData.notes[topicId]) {
+                appData.notes[topicId] = { text: '', tasks: [] };
+            }
+
+            document.getElementById('notes-modal-title').innerText = `Apuntes para: ${topicText}`;
+            document.getElementById('notes-textarea').value = appData.notes[topicId].text || '';
+            const hasContent = appData.notes[topicId].text || (appData.notes[topicId].tasks && appData.notes[topicId].tasks.length > 0);
+            document.getElementById('delete-note-btn').style.display = hasContent ? 'inline-block' : 'none';
+            
+            renderTasks();
+
+            const modal = document.getElementById('notes-modal');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modal.querySelector('.modal-content').classList.remove('scale-95');
+            }, 10);
+        }
+
+        function closeNotesModal() {
+            const modal = document.getElementById('notes-modal');
+            modal.classList.add('opacity-0');
+            modal.querySelector('.modal-content').classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+        
+        function saveNote() {
+            if (currentNoteTopicId) {
+                const noteText = document.getElementById('notes-textarea').value;
+                appData.notes[currentNoteTopicId].text = noteText;
+                
+                if (!appData.notes[currentNoteTopicId].text && (!appData.notes[currentNoteTopicId].tasks || appData.notes[currentNoteTopicId].tasks.length === 0)) {
+                    delete appData.notes[currentNoteTopicId];
+                }
+                
+                saveData();
+                renderSyllabus();
+                closeNotesModal();
+            }
+        }
+
+        function deleteNote() {
+            if (currentNoteTopicId && confirm('¿Estás seguro de que quieres eliminar esta nota y sus tareas asociadas?')) {
+                delete appData.notes[currentNoteTopicId];
+                saveData();
+                renderSyllabus();
+                closeNotesModal();
+            }
+        }
+
+        function renderTasks() {
+            const taskList = document.getElementById('task-list');
+            taskList.innerHTML = '';
+            const tasks = appData.notes[currentNoteTopicId]?.tasks || [];
+
+            if (tasks.length === 0) {
+                taskList.innerHTML = `<p class="text-sm text-center text-gray-400 py-4">No hay tareas para este tema.</p>`;
+                return;
+            }
+
+            tasks.forEach(task => {
+                const taskItem = document.createElement('div');
+                taskItem.className = 'task-list-item flex items-center justify-between text-sm';
+                taskItem.innerHTML = `
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" onchange="toggleTask('${task.id}')" ${task.completed ? 'checked' : ''} class="dream-checkbox text-pink-400 rounded-sm">
+                        <span class="ml-3">${task.text}</span>
+                    </label>
+                    <button onclick="deleteTask('${task.id}')" class="text-gray-400 hover:text-red-500 font-bold">&times;</button>
+                `;
+                taskList.appendChild(taskItem);
+            });
+        }
+        
+        document.getElementById('task-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const taskInput = document.getElementById('task-input');
+            const taskText = taskInput.value.trim();
+            if (taskText && currentNoteTopicId) {
+                if (!appData.notes[currentNoteTopicId].tasks) {
+                    appData.notes[currentNoteTopicId].tasks = [];
+                }
+                const newTask = {
+                    id: 't' + Date.now(),
+                    text: taskText,
+                    completed: false
+                };
+                appData.notes[currentNoteTopicId].tasks.push(newTask);
+                saveData();
+                renderTasks();
+                taskInput.value = '';
+                document.getElementById('delete-note-btn').style.display = 'inline-block';
+            }
+        });
+
+        function toggleTask(taskId) {
+            const task = appData.notes[currentNoteTopicId].tasks.find(t => t.id === taskId);
+            if (task) {
+                task.completed = !task.completed;
+                saveData();
+                renderTasks();
+            }
+        }
+        
+        function deleteTask(taskId) {
+            appData.notes[currentNoteTopicId].tasks = appData.notes[currentNoteTopicId].tasks.filter(t => t.id !== taskId);
+            saveData();
+            renderTasks();
+        }
+
+        function downloadNotePDF() {
+            if (!currentNoteTopicId) return;
+            const noteData = appData.notes[currentNoteTopicId];
+
+            const doc = new jsPDF();
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(18);
+            doc.text("Apuntes de DreamLAB", 105, 20, null, null, "center");
+
+            doc.setFontSize(14);
+            doc.text(currentNoteTopicText, 105, 30, null, null, "center");
+
+            doc.setLineWidth(0.5);
+            doc.line(20, 35, 190, 35);
+
+            doc.setFont("helvetica", "bold");
+            doc.text("📝 Apuntes:", 20, 45);
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(12);
+            doc.text(noteData.text || "No hay apuntes guardados.", 20, 53, { maxWidth: 170 });
+            
+            let yPosition = doc.autoTable ? doc.autoTable.previous.finalY + 20 : 90;
+
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(14);
+            doc.text("✅ Tareas Asociadas:", 20, yPosition);
+            yPosition += 8;
+
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(12);
+            if (noteData.tasks && noteData.tasks.length > 0) {
+                noteData.tasks.forEach(task => {
+                    doc.text(`[${task.completed ? 'X' : ' '}] ${task.text}`, 25, yPosition, { maxWidth: 160 });
+                    yPosition += 7;
+                });
+            } else {
+                doc.text("No hay tareas asociadas.", 25, yPosition);
+            }
+            
+            doc.save(`apuntes_${currentNoteTopicId}.pdf`);
+        }
+
+        // --- LAB PRACTICES ---
+        function renderLabPractices() {
+            const container = document.getElementById('lab-practices-container');
+            container.innerHTML = '';
+            labPractices.forEach(practice => {
+                const practiceCard = document.createElement('div');
+                practiceCard.className = 'card p-6 text-center flex flex-col justify-between';
+                
+                const stampImage = appData.labStamps[practice.id];
+                const reportImages = appData.labReports[practice.id] || [];
+                const validatedLevel = appData.labLevels[practice.id];
+
+                const displayHTML = stampImage 
+                    ? `<img src="${stampImage}" class="h-24 w-24 mx-auto object-cover rounded-full mb-2 border-4 border-pink-200">`
+                    : `<div class="h-24 w-24 mx-auto bg-gray-100 rounded-full flex items-center justify-center border-2 border-dashed border-gray-300 mb-2">
+                           <span class="text-sm text-gray-400">Sin Sello</span>
+                       </div>`;
+                
+                const actionButtonHTML = stampImage
+                    ? `<button onclick="removeStamp('${practice.id}')" class="text-xs text-red-500 hover:underline">Quitar Sello</button>`
+                    : `<label for="stamp-upload-${practice.id}" class="cursor-pointer bg-pink-400 text-white text-sm font-bold py-2 px-4 rounded-full hover:bg-pink-500 transition-colors">
+                           Añadir Sello
+                       </label>
+                       <input type="file" id="stamp-upload-${practice.id}" class="hidden" accept="image/*" onchange="handleStampUpload(event, '${practice.id}')">`;
+                
+                let thumbnailsHTML = '';
+                if (reportImages.length > 0) {
+                    thumbnailsHTML = reportImages.map((imgSrc, index) => `
+                        <img src="${imgSrc}" class="h-10 w-10 object-cover rounded-md border-2 border-gray-300 cursor-pointer hover:border-pink-400" onclick="openReportViewer('${practice.id}', ${index})">
+                    `).join('');
+                }
+
+                const reportHTML = `
+                    <div class="mt-3">
+                        <p class="text-xs font-semibold mb-2" style="text-shadow: none; filter: none; color: var(--kirby-dark-text);">Reporte Fotográfico (${reportImages.length})</p>
+                        <div class="flex flex-wrap gap-2 justify-center mb-2 min-h-[48px] bg-gray-50 rounded-lg p-2">
+                            ${thumbnailsHTML || '<span class="text-xs text-gray-400 self-center">Sin fotos</span>'}
+                        </div>
+                        <div class="flex justify-center items-center gap-2">
+                            <label for="report-upload-${practice.id}" class="cursor-pointer text-xs bg-gray-200 text-gray-600 px-3 py-1 rounded-full hover:bg-gray-300">
+                                Añadir Foto
+                            </label>
+                            <input type="file" id="report-upload-${practice.id}" class="hidden" accept="image/*" onchange="handleReportUpload(event, '${practice.id}')">
+                            ${reportImages.length > 0 ? `<button onclick="clearReportImages('${practice.id}')" class="text-xs text-red-500 hover:underline">Quitar Todas</button>` : ''}
+                        </div>
+                    </div>
+                `;
+
+                const levelOptions = practiceLevels.map(level => `<option value="${level}" ${validatedLevel === level ? 'selected' : ''}>${level}</option>`).join('');
+                const validationHTML = `
+                    <div class="mt-3 pt-3 border-t border-gray-200">
+                         <p class="text-xs font-semibold mb-2" style="text-shadow: none; filter: none; color: var(--kirby-dark-text);">Nivel Alcanzado</p>
+                        ${validatedLevel ? `
+                            <div class="bg-green-100 text-green-800 text-sm font-bold p-2 rounded-full">${validatedLevel}</div>
+                            <button onclick="downloadCertificate('practice', '${practice.id}')" class="mt-2 text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full hover:bg-blue-200">Descargar Comprobante</button>
+                        ` : `
+                            <div class="space-y-2">
+                                <select id="level-select-${practice.id}" class="block w-full text-sm rounded-full border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500">
+                                    ${levelOptions}
+                                </select>
+                                <input type="password" id="password-input-${practice.id}" placeholder="Contraseña Docente" class="block w-full text-sm rounded-full border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500">
+                                <button onclick="validateLevel('${practice.id}')" class="w-full text-xs bg-purple-400 text-white px-3 py-1 rounded-full hover:bg-purple-500">Validar Nivel</button>
+                            </div>
+                        `}
+                    </div>
+                `;
+
+                practiceCard.innerHTML = `
+                    <div>
+                        <h3 class="font-kirby text-lg mb-2 h-12">${practice.name}</h3>
+                        ${displayHTML}
+                         ${actionButtonHTML}
+                    </div>
+                    <div>
+                        ${reportHTML}
+                        ${validationHTML}
+                    </div>
+                `;
+                container.appendChild(practiceCard);
+            });
+        }
+        
+        function handleStampUpload(event, practiceId) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                appData.labStamps[practiceId] = e.target.result;
+                saveData();
+                renderLabPractices();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeStamp(practiceId) {
+            if (confirm('¿Estás seguro de que quieres quitar este sello?')) {
+                delete appData.labStamps[practiceId];
+                saveData();
+                renderLabPractices();
+            }
+        }
+
+        function handleReportUpload(event, practiceId) {
+            const file = event.target.files[0];
+            if (!file || !file.type.startsWith('image/')) {
+                alert('Por favor, selecciona un archivo de imagen.');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                if (!Array.isArray(appData.labReports[practiceId])) {
+                    appData.labReports[practiceId] = [];
+                }
+                appData.labReports[practiceId].push(e.target.result);
+                saveData();
+                renderLabPractices();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function clearReportImages(practiceId) {
+            if (confirm('¿Estás seguro de que quieres quitar todas las fotos de este reporte?')) {
+                delete appData.labReports[practiceId];
+                saveData();
+                renderLabPractices();
+            }
+        }
+        
+        function validateLevel(practiceId) {
+            const passwordInput = document.getElementById(`password-input-${practiceId}`);
+            const levelSelect = document.getElementById(`level-select-${practiceId}`);
+            if (passwordInput.value === TEACHER_PASSWORD) {
+                appData.labLevels[practiceId] = levelSelect.value;
+                saveData();
+                renderLabPractices();
+            } else {
+                passwordInput.style.borderColor = 'red';
+                passwordInput.value = '';
+                passwordInput.placeholder = '¡Incorrecta!';
+                setTimeout(() => {
+                    passwordInput.style.borderColor = '';
+                    passwordInput.placeholder = 'Contraseña Docente';
+                }, 2000);
+            }
+        }
+
+        // --- THEORETICAL EXAMS ---
+        function renderExams() {
+            const container = document.getElementById('exams-container');
+            container.innerHTML = '';
+            syllabus.forEach(unit => {
+                const examCard = document.createElement('div');
+                examCard.className = 'card p-6 text-center flex flex-col justify-between';
+                const exam = appData.examData[unit.id] || {};
+                const isValidated = exam.validated;
+
+                const photoHTML = exam.photo
+                    ? `<img src="${exam.photo}" class="w-full h-32 object-contain mx-auto mb-2 rounded-lg cursor-pointer" onclick="openReportViewer('${unit.id}', 0, true)">`
+                    : `<div class="w-full h-32 mx-auto bg-gray-100 flex items-center justify-center border-2 border-dashed border-gray-300 mb-2 rounded-lg">
+                           <span class="text-sm text-gray-400">Sin Evidencia</span>
+                       </div>`;
+
+                const photoActionHTML = exam.photo
+                    ? `<button onclick="removeExamPhoto('${unit.id}')" class="text-xs text-red-500 hover:underline">Quitar Foto</button>`
+                    : `<label for="exam-upload-${unit.id}" class="cursor-pointer text-xs bg-gray-200 text-gray-600 px-3 py-1 rounded-full hover:bg-gray-300">
+                           Añadir Foto
+                       </label>
+                       <input type="file" id="exam-upload-${unit.id}" class="hidden" accept="image/*" onchange="handleExamPhotoUpload(event, '${unit.id}')">`;
+                
+                const validationHTML = `
+                    <div class="mt-3 pt-3 border-t border-gray-200">
+                         <p class="text-xs font-semibold mb-2" style="text-shadow: none; filter: none; color: var(--kirby-dark-text);">Calificación Validada</p>
+                        ${isValidated ? `
+                            <div class="bg-green-100 text-green-800 text-sm font-bold p-2 rounded-full">Calificación: ${exam.grade}</div>
+                            <button onclick="downloadCertificate('exam', '${unit.id}')" class="mt-2 text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full hover:bg-blue-200">Descargar Comprobante</button>
+                        ` : `
+                             <div class="space-y-2">
+                                <input type="number" id="grade-input-${unit.id}" min="0" max="10" step="0.1" placeholder="Calificación (0-10)" class="block w-full text-sm rounded-full border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500">
+                                <input type="password" id="exam-password-${unit.id}" placeholder="Contraseña Docente" class="block w-full text-sm rounded-full border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500">
+                                <button onclick="validateExam('${unit.id}')" class="w-full text-xs bg-purple-400 text-white px-3 py-1 rounded-full hover:bg-purple-500">Validar Calificación</button>
+                            </div>
+                        `}
+                    </div>
+                `;
+
+                examCard.innerHTML = `
+                    <div>
+                        <h3 class="font-kirby text-lg mb-2 h-12">${unit.title}</h3>
+                        ${photoHTML}
+                        ${photoActionHTML}
+                    </div>
+                    <div>
+                        ${validationHTML}
+                    </div>
+                `;
+                container.appendChild(examCard);
+            });
+        }
+        
+        function handleExamPhotoUpload(event, unitId) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                if (!appData.examData[unitId]) appData.examData[unitId] = {};
+                appData.examData[unitId].photo = e.target.result;
+                saveData();
+                renderExams();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeExamPhoto(unitId) {
+            if (confirm('¿Estás seguro de que quieres quitar esta foto?')) {
+                if (appData.examData[unitId]) {
+                    delete appData.examData[unitId].photo;
+                    saveData();
+                    renderExams();
+                }
+            }
+        }
+
+        function validateExam(unitId) {
+            const passwordInput = document.getElementById(`exam-password-${unitId}`);
+            const gradeInput = document.getElementById(`grade-input-${unitId}`);
+            const grade = parseFloat(gradeInput.value);
+
+            if (isNaN(grade) || grade < 0 || grade > 10) {
+                alert("Por favor, introduce una calificación válida entre 0 y 10.");
+                return;
+            }
+
+            if (passwordInput.value === TEACHER_PASSWORD) {
+                if (!appData.examData[unitId]) appData.examData[unitId] = {};
+                appData.examData[unitId].grade = grade;
+                appData.examData[unitId].validated = true;
+                saveData();
+                renderExams();
+            } else {
+                passwordInput.style.borderColor = 'red';
+                passwordInput.value = '';
+                passwordInput.placeholder = '¡Incorrecta!';
+                setTimeout(() => {
+                    passwordInput.style.borderColor = '';
+                    passwordInput.placeholder = 'Contraseña Docente';
+                }, 2000);
+            }
+        }
+        
+        function downloadCertificate(type, id) {
+            const studentName = appData.studentName.trim();
+            if (!studentName) {
+                alert("Por favor, escribe tu nombre en la pestaña 'Inicio' para generar el comprobante.");
+                switchTab('inicio');
+                document.getElementById('student-name-input').focus();
+                return;
+            }
+
+            let title, subject, details, filename;
+            const validationDate = new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+
+            if (type === 'practice') {
+                const practice = labPractices.find(p => p.id === id);
+                const level = appData.labLevels[id];
+                title = "Comprobante de Habilidad Práctica";
+                subject = practice.name;
+                details = [
+                    { label: `ha demostrado un nivel de competencia de`, value: level },
+                    { label: `en la práctica de laboratorio:`, value: subject }
+                ];
+                filename = `Comprobante_Práctica_${subject.replace(/ /g, '_')}.pdf`;
+            } else { // exam
+                const unit = syllabus.find(u => u.id === id);
+                const grade = appData.examData[id].grade;
+                title = "Comprobante de Examen Teórico";
+                subject = unit.title;
+                details = [
+                    { label: `ha obtenido la calificación de`, value: grade },
+                    { label: `en el examen teórico de la:`, value: subject }
+                ];
+                filename = `Comprobante_Examen_${unit.id}.pdf`;
+            }
+
+            const doc = new jsPDF();
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(22);
+            doc.text(title, 105, 20, null, null, "center");
+
+            doc.setFontSize(14);
+            doc.setFont("helvetica", "normal");
+            doc.text(`Este documento certifica que:`, 105, 40, null, null, "center");
+            
+            doc.setFontSize(18);
+            doc.setFont("helvetica", "bold");
+            doc.text(studentName, 105, 55, null, null, "center");
+
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "normal");
+            doc.text(details[0].label, 105, 65, null, null, "center");
+
+            doc.setFontSize(20);
+            doc.setFont("helvetica", "bold");
+            doc.text(details[0].value.toString(), 105, 78, null, null, "center");
+            
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "normal");
+            doc.text(details[1].label, 105, 88, null, null, "center");
+
+            doc.setFontSize(14);
+            doc.setFont("helvetica", "bold");
+            doc.text(details[1].value, 105, 98, { maxWidth: 180, align: 'center' });
+
+            doc.setFontSize(10);
+            doc.text(`Validado en DreamLAB el ${validationDate}.`, 105, 120, null, null, "center");
+
+            doc.save(filename);
+        }
+
+
+
+        // --- REPORT VIEWER MODAL ---
+        function updateReportViewerDisplay() {
+            const isExam = currentReportPracticeId.startsWith('u');
+            const images = isExam ? [appData.examData[currentReportPracticeId].photo] : (appData.labReports[currentReportPracticeId] || []);
+            
+            if (!images || images.length === 0) {
+                closeReportViewer(); return;
+            }
+            const modalImage = document.getElementById('report-viewer-image');
+            const counter = document.getElementById('report-viewer-counter');
+            const prevBtn = document.getElementById('report-viewer-prev');
+            const nextBtn = document.getElementById('report-viewer-next');
+            modalImage.src = images[currentReportImageIndex];
+            counter.innerText = `${currentReportImageIndex + 1} / ${images.length}`;
+            
+            const isSingleImage = images.length <= 1;
+            prevBtn.style.display = isSingleImage ? 'none' : 'block';
+            nextBtn.style.display = isSingleImage ? 'none' : 'block';
+            counter.style.display = isSingleImage ? 'none' : 'block';
+
+            prevBtn.disabled = currentReportImageIndex === 0;
+            nextBtn.disabled = currentReportImageIndex === images.length - 1;
+            prevBtn.style.opacity = prevBtn.disabled ? '0.5' : '1';
+            nextBtn.style.opacity = nextBtn.disabled ? '0.5' : '1';
+        }
+
+        function openReportViewer(id, index = 0, isExam = false) {
+            currentReportPracticeId = id;
+            currentReportImageIndex = index;
+            resetZoom();
+            
+            let title = '';
+            if (isExam) {
+                const unit = syllabus.find(u => u.id === id);
+                title = `Evidencia de: ${unit.title}`;
+            } else {
+                const practice = labPractices.find(p => p.id === id);
+                title = `Reporte de: ${practice.name}`;
+            }
+            document.getElementById('report-viewer-title').innerText = title;
+
+            updateReportViewerDisplay();
+            const modal = document.getElementById('report-viewer-modal');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modal.querySelector('.modal-content').classList.remove('scale-95');
+            }, 10);
+        }
+
+        function closeReportViewer() {
+            const modal = document.getElementById('report-viewer-modal');
+            modal.classList.add('opacity-0');
+            modal.querySelector('.modal-content').classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+
+        function navigateReportViewer(direction) {
+            const images = appData.labReports[currentReportPracticeId] || [];
+            const newIndex = currentReportImageIndex + direction;
+            if (newIndex >= 0 && newIndex < images.length) {
+                currentReportImageIndex = newIndex;
+                resetZoom();
+                updateReportViewerDisplay();
+            }
+        }
+
+        function applyZoom() {
+            const img = document.getElementById('report-viewer-image');
+            img.style.transform = `scale(${zoomLevel}) translate(${startImgPos.x}px, ${startImgPos.y}px)`;
+        }
+        function zoomIn() { zoomLevel = Math.min(zoomLevel + 0.2, 5); applyZoom(); }
+        function zoomOut() { zoomLevel = Math.max(zoomLevel - 0.2, 0.5); applyZoom(); }
+        function resetZoom() {
+            zoomLevel = 1;
+            startImgPos = { x: 0, y: 0 };
+            applyZoom();
+        }
+
+
+        // --- STAR VAULT ---
+        function renderStarVault() {
+            const logContainer = document.getElementById('star-vault-log');
+            logContainer.innerHTML = '';
+            if (appData.starVault.length === 0) {
+                logContainer.innerHTML = '<p class="text-kirby-light-text text-center p-4">Tu bóveda está vacía. ¡Completa misiones y registra tus estrellas!</p>';
+                return;
+            }
+            const sortedVault = [...appData.starVault].sort((a, b) => new Date(b.date) - new Date(a.date));
+            sortedVault.forEach(entry => {
+                const entryDate = new Date(entry.date);
+                const formattedDate = entryDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' });
+                const logEntry = document.createElement('div');
+                logEntry.className = 'flex justify-between items-center bg-gray-50 p-3 rounded-2xl';
+                logEntry.innerHTML = `
+                    <div>
+                        <p class="font-semibold">${entry.activity}</p>
+                        <p class="text-xs text-gray-500">Obtenido: ${formattedDate}</p>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="font-bold text-yellow-500 mr-4">${entry.stars} EC</span>
+                        <button onclick="deleteStarEntry('${entry.id}')" class="text-gray-400 hover:text-red-500 text-sm font-bold">&times;</button>
+                    </div>
+                `;
+                logContainer.appendChild(logEntry);
+            });
+        }
+
+        function updateVaultSummary() {
+            const totalVaultStars = appData.starVault.reduce((acc, entry) => acc + entry.stars, 0);
+            const remainingStars = totalVaultStars % 100;
+            const starsForNextPackage = remainingStars === 0 && totalVaultStars > 0 ? 0 : 100 - remainingStars;
+            document.getElementById('vault-total-stars').innerText = `${totalVaultStars} EC`;
+            document.getElementById('vault-next-package').innerText = `Faltan ${starsForNextPackage}`;
+            document.getElementById('vault-remaining-stars').innerText = `${remainingStars} EC`;
+        }
+        
+        function deleteStarEntry(entryId) {
+            appData.starVault = appData.starVault.filter(entry => entry.id !== entryId);
+            saveData();
+            updateAll();
+        }
+
+        // --- MISSIONS ---
+        function renderMissions() {
+            const pendingList = document.getElementById('pending-missions-list');
+            const completedList = document.getElementById('completed-missions-list');
+            const upcomingContainer = document.getElementById('upcoming-missions-container');
+            pendingList.innerHTML = '';
+            completedList.innerHTML = '';
+            upcomingContainer.innerHTML = '';
+            const pendingMissions = appData.missions.filter(m => m.status === 'pending');
+            const completedMissions = appData.missions.filter(m => m.status === 'completed');
+
+            if (pendingMissions.length === 0) {
+                pendingList.innerHTML = '<p class="text-kirby-light-text text-center p-4">¡Ninguna misión pendiente!</p>';
+            } else {
+                pendingMissions.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate)).forEach(mission => {
+                    pendingList.appendChild(createMissionCard(mission));
+                });
+            }
+
+            if (completedMissions.length === 0) {
+                completedList.innerHTML = '<p class="text-kirby-light-text text-center p-4">Aún no completas ninguna misión.</p>';
+            } else {
+                completedMissions.forEach(mission => {
+                    completedList.appendChild(createMissionCard(mission));
+                });
+            }
+
+            const upcomingMissions = pendingMissions.slice(0, 3);
+            if (upcomingMissions.length > 0) {
+                upcomingMissions.forEach(mission => {
+                    upcomingContainer.appendChild(createMissionCard(mission, true)); // 'true' for compact version
+                });
+            } else {
+                upcomingContainer.innerHTML = '<p class="text-kirby-light-text">No tienes misiones pendientes. ¡Planifica una nueva en la pestaña "Misiones"!</p>';
+            }
+        }
+
+        function createMissionCard(mission, isCompact = false) {
+            const card = document.createElement('div');
+            card.className = 'card p-4';
+            const dueDate = new Date(mission.dueDate + 'T00:00:00');
+            const formattedDate = dueDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+            let actionButton = '';
+            if (mission.status === 'pending') {
+                actionButton = `<button onclick="completeMission('${mission.id}')" class="bg-green-100 text-green-700 font-semibold py-2 px-4 rounded-full hover:bg-green-200 transition-colors text-sm">Completar</button>`;
+            } else {
+                actionButton = `<span class="text-green-500 font-bold text-sm">¡Lograda!</span>`;
+            }
+            const detailsHTML = isCompact ? '' : `
+                <div class="mt-4 pt-4 border-t border-gray-200 text-sm space-y-2 text-kirby-light-text">
+                    <p><strong>🎯 Objetivo:</strong> ${mission.objective || 'No definido'}</p>
+                    <p><strong>📝 Pasos:</strong><br>${mission.steps.replace(/\n/g, '<br>') || 'No definidos'}</p>
+                    <p><strong>📚 Recursos:</strong> ${mission.resources || 'No definidos'}</p>
+                </div>
+            `;
+            card.innerHTML = `
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="font-semibold font-kirby text-lg">${mission.desc}</p>
+                        <p class="text-sm text-gray-500">Fecha Límite: ${formattedDate}</p>
+                    </div>
+                    <div class="flex items-center space-x-4 flex-shrink-0 ml-4">
+                        <div class="flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                            <span class="ml-1 font-bold">${mission.stars}</span>
+                        </div>
+                        ${actionButton}
+                    </div>
+                </div>
+                ${detailsHTML}
+                 <div class="mt-4 text-right">
+                    <button onclick="downloadMissionPDF('${mission.id}')" class="text-xs bg-gray-200 text-gray-600 px-3 py-1 rounded-full hover:bg-gray-300">Descargar PDF</button>
+                </div>
+            `;
+            return card;
+        }
+
+        function completeMission(missionId) {
+            const mission = appData.missions.find(m => m.id === missionId);
+            if (mission) {
+                mission.status = 'completed';
+                saveData();
+                updateAll();
+            }
+        }
+        
+        function downloadMissionPDF(missionId) {
+            const mission = appData.missions.find(m => m.id === missionId);
+            if (!mission) return;
+            const doc = new jsPDF();
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(22);
+            doc.text("Plan de Misión: DreamLAB", 105, 20, null, null, "center");
+            doc.setFontSize(16);
+            doc.text(mission.desc, 105, 30, null, null, "center");
+            doc.setLineWidth(0.5);
+            doc.line(20, 35, 190, 35);
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "normal");
+            doc.text(`Estrellas de Crédito: ${mission.stars}`, 20, 45);
+            doc.text(`Fecha Límite: ${new Date(mission.dueDate + 'T00:00:00').toLocaleDateString('es-ES')}`, 190, 45, null, null, "right");
+            doc.setFont("helvetica", "bold");
+            doc.text("🎯 Objetivo Principal:", 20, 60);
+            doc.setFont("helvetica", "normal");
+            doc.text(mission.objective || "No especificado.", 20, 68, { maxWidth: 170 });
+            doc.setFont("helvetica", "bold");
+            doc.text("📝 Pasos Clave:", 20, 90);
+            doc.setFont("helvetica", "normal");
+            doc.text(mission.steps || "No especificados.", 20, 98, { maxWidth: 170 });
+            doc.setFont("helvetica", "bold");
+            doc.text("📚 Recursos Necesarios:", 20, 140);
+            doc.setFont("helvetica", "normal");
+            doc.text(mission.resources || "No especificados.", 20, 148, { maxWidth: 170 });
+            doc.save(`mision_${mission.id}.pdf`);
+        }
+
+
+        // --- CHARTS & DASHBOARD ---
+        function updateProgress() {
+            const totalTopics = syllabus.reduce((acc, unit) => acc + unit.topics.length, 0);
+            const completedTopics = Object.values(appData.progress).filter(Boolean).length;
+            const percentage = totalTopics > 0 ? (completedTopics / totalTopics) * 100 : 0;
+            const progressBar = document.getElementById('global-progress-bar');
+            const progressText = document.getElementById('global-progress-text');
+            progressBar.style.width = `${percentage}%`;
+            progressBar.innerText = `${Math.round(percentage)}%`;
+            progressText.innerText = `${Math.round(percentage)}% completado`;
+        }
+
+        function updateStars() {
+            const totalStars = appData.starVault.reduce((acc, entry) => acc + entry.stars, 0);
+            document.getElementById('total-stars-header').innerText = totalStars;
+            document.getElementById('total-stars-dashboard').innerText = totalStars;
+        }
+        
+        function updateCharts() {
+            if (progressChartInstance) progressChartInstance.destroy();
+            if (topicsChartInstance) topicsChartInstance.destroy();
+            const unitProgressData = syllabus.map(unit => {
+                const totalTopics = unit.topics.length;
+                const completedTopics = unit.topics.filter(topic => appData.progress[topic.id]).length;
+                return (totalTopics > 0) ? (completedTopics / totalTopics) * 100 : 0;
+            });
+            const progressCtx = document.getElementById('progressChart').getContext('2d');
+            progressChartInstance = new Chart(progressCtx, {
+                type: 'doughnut', data: { labels: syllabus.map(unit => `Unidad ${unit.id.replace('u','')}`), datasets: [{ label: 'Avance %', data: unitProgressData, backgroundColor: ['#f8b4d8', '#d8b4fe', '#a0e8f0', '#98fb98', '#fde047', '#ffcda5', '#ffafbd'], borderColor: '#ffffff', borderWidth: 4 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: {font: {family: 'Inter'}}} } }
+            });
+            const totalTopics = syllabus.reduce((acc, unit) => acc + unit.topics.length, 0);
+            const completedTopics = Object.values(appData.progress).filter(Boolean).length;
+            const pendingTopics = totalTopics - completedTopics;
+            const topicsCtx = document.getElementById('topicsChart').getContext('2d');
+            topicsChartInstance = new Chart(topicsCtx, {
+                type: 'pie', data: { labels: ['Temas Completados', 'Temas Pendientes'], datasets: [{ data: [completedTopics, pendingTopics], backgroundColor: ['#ec4899', '#e5e7eb'], borderColor: '#ffffff', borderWidth: 4 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: {font: {family: 'Inter'}} } } }
+            });
+        }
+        
+        // --- STUDENT NAME ---
+        function displayStudentName() {
+            const nameText = document.getElementById('student-name-text');
+            const nameInput = document.getElementById('student-name-input');
+            const displayContainer = document.getElementById('student-name-display-container');
+            const editContainer = document.getElementById('student-name-edit-container');
+
+            if (appData.studentName && appData.studentName.trim()) {
+                nameText.textContent = appData.studentName;
+                nameInput.value = appData.studentName;
+                displayContainer.classList.remove('hidden');
+                editContainer.classList.add('hidden');
+            } else {
+                displayContainer.classList.add('hidden');
+                editContainer.classList.remove('hidden');
+            }
+        }
+
+        function editStudentName() {
+            document.getElementById('student-name-display-container').classList.add('hidden');
+            document.getElementById('student-name-edit-container').classList.remove('hidden');
+            document.getElementById('student-name-input').focus();
+        }
+
+        function saveStudentName() {
+            const nameInput = document.getElementById('student-name-input');
+            appData.studentName = nameInput.value.trim();
+            saveData();
+            displayStudentName();
+        }
+
+
+        // --- GLOBAL UPDATE ---
+        function updateAll() {
+            renderSyllabus();
+            renderMissions();
+            renderStarVault();
+            renderLabPractices();
+            renderExams();
+            updateProgress();
+            updateStars();
+            updateVaultSummary();
+            setTimeout(updateTravelingStarPosition, 50);
+        }
+
+        function initializeMissionPlanner() {
+            const select = document.getElementById('mission-select');
+            const customContainer = document.getElementById('custom-mission-container');
+            const customInput = document.getElementById('mission-custom-desc');
+            optionalMissions.forEach(mission => {
+                const option = document.createElement('option');
+                option.value = mission.id;
+                option.textContent = mission.text;
+                select.appendChild(option);
+            });
+            select.innerHTML += '<option value="custom">Otra Misión (personalizada)...</option>';
+            select.addEventListener('change', () => {
+                if (select.value === 'custom') {
+                    customContainer.classList.remove('hidden');
+                    customInput.required = true;
+                } else {
+                    customContainer.classList.add('hidden');
+                    customInput.required = false;
+                }
+            });
+        }
+        
+        // --- EVENT LISTENERS & INITIALIZATION ---
+        document.getElementById('mission-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const missionSelect = document.getElementById('mission-select');
+            const customDescInput = document.getElementById('mission-custom-desc');
+            let missionDescText = '';
+            if (missionSelect.value === 'custom') {
+                missionDescText = customDescInput.value.trim();
+            } else {
+                missionDescText = missionSelect.options[missionSelect.selectedIndex].text;
+            }
+            if (!missionDescText) return;
+            const newMission = {
+                id: 'm' + Date.now(),
+                desc: missionDescText,
+                objective: document.getElementById('mission-objective').value.trim(),
+                steps: document.getElementById('mission-steps').value.trim(),
+                resources: document.getElementById('mission-resources').value.trim(),
+                stars: parseInt(document.getElementById('mission-stars').value),
+                dueDate: document.getElementById('mission-due-date').value,
+                status: 'pending'
+            };
+            appData.missions.push(newMission);
+            saveData();
+            renderMissions();
+            this.reset();
+            missionSelect.value = optionalMissions[0].id;
+            document.getElementById('custom-mission-container').classList.add('hidden');
+        });
+
+        document.getElementById('star-vault-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const activity = document.getElementById('vault-activity').value.trim();
+            const stars = parseInt(document.getElementById('vault-stars').value);
+            if (activity && stars > 0) {
+                const newEntry = {
+                    id: 'sv' + Date.now(),
+                    activity: activity,
+                    stars: stars,
+                    date: new Date().toISOString()
+                };
+                appData.starVault.push(newEntry);
+                saveData();
+                updateAll();
+                this.reset();
+            }
+        });
+        
+        document.getElementById('star-converter-input').addEventListener('input', function(e) {
+            const stars = parseFloat(e.target.value) || 0;
+            const heartPoints = (stars / 100) * 5;
+            document.getElementById('heart-points-output').innerText = `${heartPoints.toFixed(1)} PC`;
+        });
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            const syllabusWrapper = document.getElementById('syllabus-wrapper');
+            if (syllabusWrapper) {
+                 syllabusWrapper.insertAdjacentHTML('afterbegin', `
+                    <div id="star-path-line"></div>
+                    <div id="traveling-star-path">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 floating-star" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                    </div>
+                `);
+            }
+            
+            // Report viewer listeners
+            document.getElementById('report-viewer-prev').addEventListener('click', () => navigateReportViewer(-1));
+            document.getElementById('report-viewer-next').addEventListener('click', () => navigateReportViewer(1));
+            document.getElementById('report-viewer-zoom-in').addEventListener('click', zoomIn);
+            document.getElementById('report-viewer-zoom-out').addEventListener('click', zoomOut);
+            document.getElementById('report-viewer-zoom-reset').addEventListener('click', resetZoom);
+            const viewerImgContainer = document.getElementById('report-viewer-img-container');
+            const viewerImg = document.getElementById('report-viewer-image');
+            
+            viewerImgContainer.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                if (e.deltaY < 0) zoomIn(); else zoomOut();
+            });
+            viewerImgContainer.addEventListener('mousedown', (e) => {
+                if (zoomLevel > 1) {
+                    isPanning = true;
+                    viewerImgContainer.classList.add('grabbing');
+                    startPan = { x: e.clientX, y: e.clientY };
+                    const style = window.getComputedStyle(viewerImg);
+                    const matrix = new DOMMatrixReadOnly(style.transform);
+                    startImgPos = { x: matrix.m41 / zoomLevel, y: matrix.m42 / zoomLevel };
+                }
+            });
+            window.addEventListener('mouseup', () => {
+                isPanning = false;
+                viewerImgContainer.classList.remove('grabbing');
+            });
+            window.addEventListener('mousemove', (e) => {
+                if (isPanning) {
+                    const dx = (e.clientX - startPan.x) / zoomLevel;
+                    const dy = (e.clientY - startPan.y) / zoomLevel;
+                    viewerImg.style.transform = `scale(${zoomLevel}) translate(${startImgPos.x + dx}px, ${startImgPos.y + dy}px)`;
+                }
+            });
+
+            loadData();
+            displayStudentName();
+            initializeMissionPlanner();
+            updateAll();
+            switchTab('inicio');
+        });
+    </script>
+</body>
+</html>
+
