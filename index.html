@@ -21,6 +21,9 @@
             --bubblegum-pink: #F571A3;
             --cheerful-yellow: #FBBF24;
         }
+        html {
+            scroll-behavior: smooth;
+        }
         body {
             font-family: 'Inter', sans-serif;
             background-color: #FEF6FA; /* Rosa muy suave */
@@ -199,10 +202,11 @@
             <div class="flex border-b border-gray-200">
                 <button onclick="switchTab('inicio')" class="tab-button active text-sm sm:text-base font-semibold py-4 px-2 sm:px-6 font-kirby">Inicio</button>
                 <button onclick="switchTab('programa')" class="tab-button text-sm sm:text-base font-semibold py-4 px-2 sm:px-6 font-kirby">Programa</button>
-                <button onclick="switchTab('practicas')" class="tab-button text-sm sm:text-base font-semibold py-4 px-2 sm:px-6 font-kirby">Prácticas</button>
-                <button onclick="switchTab('examenes')" class="tab-button text-sm sm:text-base font-semibold py-4 px-2 sm:px-6 font-kirby">Exámenes</button>
-                <button onclick="switchTab('misiones')" class="tab-button text-sm sm:text-base font-semibold py-4 px-2 sm:px-6 font-kirby">Misiones</button>
                 <button onclick="switchTab('progreso')" class="tab-button text-sm sm:text-base font-semibold py-4 px-2 sm:px-6 font-kirby">Mi Progreso</button>
+                <button onclick="switchTab('actividades')" class="tab-button text-sm sm:text-base font-semibold py-4 px-2 sm:px-6 font-kirby">Actividades</button>
+                <button onclick="switchTab('examenes')" class="tab-button text-sm sm:text-base font-semibold py-4 px-2 sm:px-6 font-kirby">Exámenes</button>
+                <button onclick="switchTab('practicas')" class="tab-button text-sm sm:text-base font-semibold py-4 px-2 sm:px-6 font-kirby">Prácticas</button>
+                <button onclick="switchTab('misiones')" class="tab-button text-sm sm:text-base font-semibold py-4 px-2 sm:px-6 font-kirby">Misiones</button>
             </div>
         </nav>
     </header>
@@ -280,12 +284,27 @@
                 <!-- Exam cards will be injected here by JS -->
             </div>
         </div>
+        
+        <!-- Actividades Tab -->
+        <div id="actividades" class="tab-content hidden">
+            <h2 class="text-3xl font-bold font-kirby mb-6">Registro de Actividades</h2>
+            <p class="mb-8 text-kirby-light-text max-w-3xl">Añade y documenta cada actividad realizada en clase. ¡No dejes que se te escape ninguna!</p>
+            <div class="text-center mb-8">
+                 <button id="add-activity-btn" class="bg-purple-500 text-white kirby-button">
+                    <span class="text-lg">+</span> Añadir Nueva Actividad
+                </button>
+            </div>
+            <div id="activities-container" class="space-y-6">
+                <!-- Activity cards will be injected here by JS -->
+            </div>
+        </div>
+
 
         <!-- Misiones (Estrellas) Tab -->
         <div id="misiones" class="tab-content hidden">
              <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
                 <!-- Mission Planner -->
-                <div class="card p-8 lg:sticky top-28">
+                <div id="mission-planner-card" class="card p-8 lg:sticky top-28">
                     <h2 class="text-2xl font-bold mb-4 font-kirby">Planificador de Misiones</h2>
                     <form id="mission-form" class="space-y-4">
                         <div>
@@ -318,7 +337,7 @@
                                 <input type="date" id="mission-due-date" required class="mt-1 block w-full rounded-full border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500">
                             </div>
                         </div>
-                        <button type="submit" class="w-full bg-purple-500 text-white kirby-button">¡Añadir Misión!</button>
+                        <button type="submit" id="mission-submit-btn" class="w-full bg-purple-500 text-white kirby-button">¡Añadir Misión!</button>
                     </form>
                 </div>
 
@@ -566,7 +585,8 @@
             labStamps: {},
             labReports: {},
             labLevels: {},
-            examData: {}
+            examData: {},
+            activities: []
         };
         
         let currentNoteTopicId = null;
@@ -574,12 +594,13 @@
         let progressChartInstance = null;
         let topicsChartInstance = null;
         
-        let currentReportPracticeId = null;
+        let currentReportViewerId = null;
         let currentReportImageIndex = 0;
         let zoomLevel = 1;
         let isPanning = false;
         let startPan = { x: 0, y: 0 };
         let startImgPos = { x: 0, y: 0 };
+        let editingMissionId = null;
 
 
         // --- DATA PERSISTENCE ---
@@ -600,6 +621,7 @@
                 if (!appData.labReports) appData.labReports = {};
                 if (!appData.labLevels) appData.labLevels = {};
                 if (!appData.examData) appData.examData = {};
+                if (!appData.activities) appData.activities = [];
             }
         }
         
@@ -855,7 +877,7 @@
                 
                 const stampImage = appData.labStamps[practice.id];
                 const reportImages = appData.labReports[practice.id] || [];
-                const validatedLevel = appData.labLevels[practice.id];
+                const levelPdf = appData.labLevels[practice.id];
 
                 const displayHTML = stampImage 
                     ? `<img src="${stampImage}" class="h-24 w-24 mx-auto object-cover rounded-full mb-2 border-4 border-pink-200">`
@@ -893,21 +915,18 @@
                     </div>
                 `;
 
-                const levelOptions = practiceLevels.map(level => `<option value="${level}" ${validatedLevel === level ? 'selected' : ''}>${level}</option>`).join('');
                 const validationHTML = `
                     <div class="mt-3 pt-3 border-t border-gray-200">
                          <p class="text-xs font-semibold mb-2" style="text-shadow: none; filter: none; color: var(--kirby-dark-text);">Nivel Alcanzado</p>
-                        ${validatedLevel ? `
-                            <div class="bg-green-100 text-green-800 text-sm font-bold p-2 rounded-full">${validatedLevel}</div>
-                            <button onclick="downloadCertificate('practice', '${practice.id}')" class="mt-2 text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full hover:bg-blue-200">Descargar Comprobante</button>
+                        ${levelPdf ? `
+                            <div class="bg-green-100 text-green-800 text-sm font-bold p-2 rounded-full">Nivel Validado</div>
+                             <a href="${levelPdf}" target="_blank" class="mt-2 inline-block text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full hover:bg-blue-200">Ver Comprobante</a>
+                             <button onclick="removeLevelPdf('${practice.id}')" class="mt-2 text-xs text-red-500 hover:underline">Quitar</button>
                         ` : `
-                            <div class="space-y-2">
-                                <select id="level-select-${practice.id}" class="block w-full text-sm rounded-full border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500">
-                                    ${levelOptions}
-                                </select>
-                                <input type="password" id="password-input-${practice.id}" placeholder="Contraseña Docente" class="block w-full text-sm rounded-full border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500">
-                                <button onclick="validateLevel('${practice.id}')" class="w-full text-xs bg-purple-400 text-white px-3 py-1 rounded-full hover:bg-purple-500">Validar Nivel</button>
-                            </div>
+                            <label for="level-pdf-upload-${practice.id}" class="cursor-pointer w-full text-xs bg-purple-400 text-white px-3 py-2 rounded-full hover:bg-purple-500 inline-block">
+                                Subir PDF de Nivel
+                            </label>
+                            <input type="file" id="level-pdf-upload-${practice.id}" class="hidden" accept="application/pdf" onchange="handleLevelPdfUpload(event, '${practice.id}')">
                         `}
                     </div>
                 `;
@@ -973,21 +992,26 @@
             }
         }
         
-        function validateLevel(practiceId) {
-            const passwordInput = document.getElementById(`password-input-${practiceId}`);
-            const levelSelect = document.getElementById(`level-select-${practiceId}`);
-            if (passwordInput.value === TEACHER_PASSWORD) {
-                appData.labLevels[practiceId] = levelSelect.value;
+        function handleLevelPdfUpload(event, practiceId) {
+            const file = event.target.files[0];
+            if (!file || file.type !== 'application/pdf') {
+                alert('Por favor, selecciona un archivo PDF.');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                appData.labLevels[practiceId] = e.target.result;
                 saveData();
                 renderLabPractices();
-            } else {
-                passwordInput.style.borderColor = 'red';
-                passwordInput.value = '';
-                passwordInput.placeholder = '¡Incorrecta!';
-                setTimeout(() => {
-                    passwordInput.style.borderColor = '';
-                    passwordInput.placeholder = 'Contraseña Docente';
-                }, 2000);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeLevelPdf(practiceId) {
+             if (confirm('¿Estás seguro de que quieres quitar el PDF de nivel?')) {
+                delete appData.labLevels[practiceId];
+                saveData();
+                renderLabPractices();
             }
         }
 
@@ -999,7 +1023,7 @@
                 const examCard = document.createElement('div');
                 examCard.className = 'card p-6 text-center flex flex-col justify-between';
                 const exam = appData.examData[unit.id] || {};
-                const isValidated = exam.validated;
+                const validatedPdf = exam.validatedPdf;
 
                 const photoHTML = exam.photo
                     ? `<img src="${exam.photo}" class="w-full h-32 object-contain mx-auto mb-2 rounded-lg cursor-pointer" onclick="openReportViewer('${unit.id}', 0, true)">`
@@ -1017,15 +1041,15 @@
                 const validationHTML = `
                     <div class="mt-3 pt-3 border-t border-gray-200">
                          <p class="text-xs font-semibold mb-2" style="text-shadow: none; filter: none; color: var(--kirby-dark-text);">Calificación Validada</p>
-                        ${isValidated ? `
-                            <div class="bg-green-100 text-green-800 text-sm font-bold p-2 rounded-full">Calificación: ${exam.grade}</div>
-                            <button onclick="downloadCertificate('exam', '${unit.id}')" class="mt-2 text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full hover:bg-blue-200">Descargar Comprobante</button>
+                        ${validatedPdf ? `
+                            <div class="bg-green-100 text-green-800 text-sm font-bold p-2 rounded-full">Calificación Validada</div>
+                            <a href="${validatedPdf}" target="_blank" class="mt-2 inline-block text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full hover:bg-blue-200">Ver Comprobante</a>
+                            <button onclick="removeExamPdf('${unit.id}')" class="mt-2 text-xs text-red-500 hover:underline">Quitar</button>
                         ` : `
-                             <div class="space-y-2">
-                                <input type="number" id="grade-input-${unit.id}" min="0" max="10" step="0.1" placeholder="Calificación (0-10)" class="block w-full text-sm rounded-full border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500">
-                                <input type="password" id="exam-password-${unit.id}" placeholder="Contraseña Docente" class="block w-full text-sm rounded-full border-gray-300 shadow-sm focus:border-pink-500 focus:ring-pink-500">
-                                <button onclick="validateExam('${unit.id}')" class="w-full text-xs bg-purple-400 text-white px-3 py-1 rounded-full hover:bg-purple-500">Validar Calificación</button>
-                            </div>
+                            <label for="exam-pdf-upload-${unit.id}" class="cursor-pointer w-full text-xs bg-purple-400 text-white px-3 py-2 rounded-full hover:bg-purple-500 inline-block">
+                                Subir Comprobante PDF
+                            </label>
+                            <input type="file" id="exam-pdf-upload-${unit.id}" class="hidden" accept="application/pdf" onchange="handleExamPdfUpload(event, '${unit.id}')">
                         `}
                     </div>
                 `;
@@ -1066,113 +1090,151 @@
                 }
             }
         }
-
-        function validateExam(unitId) {
-            const passwordInput = document.getElementById(`exam-password-${unitId}`);
-            const gradeInput = document.getElementById(`grade-input-${unitId}`);
-            const grade = parseFloat(gradeInput.value);
-
-            if (isNaN(grade) || grade < 0 || grade > 10) {
-                alert("Por favor, introduce una calificación válida entre 0 y 10.");
+        
+        function handleExamPdfUpload(event, unitId) {
+            const file = event.target.files[0];
+            if (!file || file.type !== 'application/pdf') {
+                alert('Por favor, selecciona un archivo PDF.');
                 return;
             }
-
-            if (passwordInput.value === TEACHER_PASSWORD) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
                 if (!appData.examData[unitId]) appData.examData[unitId] = {};
-                appData.examData[unitId].grade = grade;
-                appData.examData[unitId].validated = true;
+                appData.examData[unitId].validatedPdf = e.target.result;
                 saveData();
                 renderExams();
-            } else {
-                passwordInput.style.borderColor = 'red';
-                passwordInput.value = '';
-                passwordInput.placeholder = '¡Incorrecta!';
-                setTimeout(() => {
-                    passwordInput.style.borderColor = '';
-                    passwordInput.placeholder = 'Contraseña Docente';
-                }, 2000);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeExamPdf(unitId) {
+            if (confirm('¿Estás seguro de que quieres quitar el comprobante del examen?')) {
+                if (appData.examData[unitId]) {
+                    delete appData.examData[unitId].validatedPdf;
+                    saveData();
+                    renderExams();
+                }
             }
         }
-        
-        function downloadCertificate(type, id) {
-            const studentName = appData.studentName.trim();
-            if (!studentName) {
-                alert("Por favor, escribe tu nombre en la pestaña 'Inicio' para generar el comprobante.");
-                switchTab('inicio');
-                document.getElementById('student-name-input').focus();
+
+        // --- ACTIVITIES ---
+        function renderActivities() {
+            const container = document.getElementById('activities-container');
+            container.innerHTML = '';
+
+            if (appData.activities.length === 0) {
+                 container.innerHTML = '<p class="text-kirby-light-text text-center p-4">Aún no has registrado ninguna actividad.</p>';
                 return;
             }
 
-            let title, subject, details, filename;
-            const validationDate = new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+            appData.activities.forEach(activity => {
+                const activityCard = document.createElement('div');
+                activityCard.className = 'card p-6';
+                activityCard.dataset.id = activity.id;
 
-            if (type === 'practice') {
-                const practice = labPractices.find(p => p.id === id);
-                const level = appData.labLevels[id];
-                title = "Comprobante de Habilidad Práctica";
-                subject = practice.name;
-                details = [
-                    { label: `ha demostrado un nivel de competencia de`, value: level },
-                    { label: `en la práctica de laboratorio:`, value: subject }
-                ];
-                filename = `Comprobante_Práctica_${subject.replace(/ /g, '_')}.pdf`;
-            } else { // exam
-                const unit = syllabus.find(u => u.id === id);
-                const grade = appData.examData[id].grade;
-                title = "Comprobante de Examen Teórico";
-                subject = unit.title;
-                details = [
-                    { label: `ha obtenido la calificación de`, value: grade },
-                    { label: `en el examen teórico de la:`, value: subject }
-                ];
-                filename = `Comprobante_Examen_${unit.id}.pdf`;
-            }
+                const stampHTML = activity.stamp
+                ? `<img src="${activity.stamp}" class="h-full w-full object-contain cursor-pointer">`
+                : `<div class="h-full w-full bg-gray-100 rounded-2xl flex items-center justify-center border-2 border-dashed border-gray-300">
+                        <span class="text-sm text-gray-400">Sin Sello</span>
+                    </div>`;
+                
+                const stampActionHTML = activity.stamp
+                ? `<button class="text-xs text-red-500 hover:underline mt-2 remove-activity-stamp">Quitar Sello</button>`
+                : `<label for="activity-stamp-${activity.id}" class="cursor-pointer bg-pink-400 text-white text-sm font-bold py-2 px-4 rounded-full hover:bg-pink-500 transition-colors">
+                        Añadir Sello
+                    </label>
+                    <input type="file" id="activity-stamp-${activity.id}" class="hidden activity-stamp-upload" accept="image/*">`;
+
+                activityCard.innerHTML = `
+                    <div class="flex justify-between items-start gap-4 mb-4">
+                        <input type="text" value="${activity.name}" placeholder="Nombre de la Actividad" class="activity-name text-xl font-bold font-kirby w-full bg-transparent focus:outline-none focus:ring-0 border-b-2 border-transparent focus:border-pink-300">
+                        <input type="date" value="${activity.date}" class="activity-date text-sm text-gray-500 bg-transparent w-40 text-right focus:outline-none focus:ring-0 border-b-2 border-transparent focus:border-pink-300">
+                        <button class="text-red-500 hover:text-red-700 text-2xl font-bold delete-activity" style="text-shadow: none; filter: none;">&times;</button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="flex flex-col items-center space-y-2">
+                           <div class="w-full h-40 rounded-2xl overflow-hidden border-2 border-gray-200 activity-stamp-viewer" data-activity-id="${activity.id}">
+                                ${stampHTML}
+                           </div>
+                           ${stampActionHTML}
+                        </div>
+                        <div class="md:col-span-2">
+                            <h3 class="text-lg font-kirby mb-2">Apuntes</h3>
+                            <textarea placeholder="Escribe tus notas aquí..." class="activity-notes w-full h-40 border border-gray-300 rounded-2xl p-4 focus:ring-pink-500 focus:border-pink-500">${activity.notes}</textarea>
+                            <div class="text-right mt-2">
+                                <button class="bg-gray-200 text-gray-800 font-bold py-2 px-6 rounded-full hover:bg-gray-300 transition-colors text-sm download-activity-pdf">Descargar Apuntes</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(activityCard);
+            });
+        }
+        
+        function addActivity() {
+            const newActivity = {
+                id: 'act' + Date.now(),
+                name: '',
+                date: '',
+                stamp: '',
+                notes: ''
+            };
+            appData.activities.push(newActivity);
+            saveData();
+            renderActivities();
+        }
+
+        function downloadActivityPdf(activityId) {
+            const activity = appData.activities.find(a => a.id === activityId);
+            if (!activity) return;
 
             const doc = new jsPDF();
             doc.setFont("helvetica", "bold");
-            doc.setFontSize(22);
-            doc.text(title, 105, 20, null, null, "center");
-
-            doc.setFontSize(14);
-            doc.setFont("helvetica", "normal");
-            doc.text(`Este documento certifica que:`, 105, 40, null, null, "center");
-            
             doc.setFontSize(18);
-            doc.setFont("helvetica", "bold");
-            doc.text(studentName, 105, 55, null, null, "center");
-
-            doc.setFontSize(12);
-            doc.setFont("helvetica", "normal");
-            doc.text(details[0].label, 105, 65, null, null, "center");
-
-            doc.setFontSize(20);
-            doc.setFont("helvetica", "bold");
-            doc.text(details[0].value.toString(), 105, 78, null, null, "center");
+            doc.text("Apuntes de Actividad - DreamLAB", 105, 20, null, null, "center");
             
-            doc.setFontSize(12);
-            doc.setFont("helvetica", "normal");
-            doc.text(details[1].label, 105, 88, null, null, "center");
-
             doc.setFontSize(14);
+            doc.text(`Actividad: ${activity.name || 'Sin Nombre'}`, 20, 35);
+            doc.text(`Fecha: ${activity.date || 'Sin Fecha'}`, 190, 35, null, null, 'right');
+
+            doc.setLineWidth(0.5);
+            doc.line(20, 40, 190, 40);
+
             doc.setFont("helvetica", "bold");
-            doc.text(details[1].value, 105, 98, { maxWidth: 180, align: 'center' });
+            doc.text("📝 Apuntes:", 20, 50);
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(12);
+            doc.text(activity.notes || "No hay apuntes guardados.", 20, 58, { maxWidth: 170 });
 
-            doc.setFontSize(10);
-            doc.text(`Validado en DreamLAB el ${validationDate}.`, 105, 120, null, null, "center");
-
-            doc.save(filename);
+            doc.save(`actividad_${activity.name.replace(/ /g, '_') || activity.id}.pdf`);
         }
-
 
 
         // --- REPORT VIEWER MODAL ---
         function updateReportViewerDisplay() {
-            const isExam = currentReportPracticeId.startsWith('u');
-            const images = isExam ? [appData.examData[currentReportPracticeId].photo] : (appData.labReports[currentReportPracticeId] || []);
+            let images, title;
+            const id = currentReportViewerId;
+
+            if (id.startsWith('u')) { // Exam photo
+                images = [appData.examData[id].photo];
+                const unit = syllabus.find(u => u.id === id);
+                title = `Evidencia de: ${unit.title}`;
+            } else if (id.startsWith('lp')) { // Lab report
+                images = appData.labReports[id] || [];
+                const practice = labPractices.find(p => p.id === id);
+                title = `Reporte de: ${practice.name}`;
+            } else { // Activity stamp
+                const activity = appData.activities.find(a => a.id === id);
+                images = activity ? [activity.stamp] : [];
+                title = activity ? `Sello de: ${activity.name}` : 'Visor de Imagen';
+            }
             
-            if (!images || images.length === 0) {
+            if (!images || images.length === 0 || !images[0]) {
                 closeReportViewer(); return;
             }
+
+            document.getElementById('report-viewer-title').innerText = title;
+
             const modalImage = document.getElementById('report-viewer-image');
             const counter = document.getElementById('report-viewer-counter');
             const prevBtn = document.getElementById('report-viewer-prev');
@@ -1191,22 +1253,12 @@
             nextBtn.style.opacity = nextBtn.disabled ? '0.5' : '1';
         }
 
-        function openReportViewer(id, index = 0, isExam = false) {
-            currentReportPracticeId = id;
+        function openReportViewer(id, index = 0) {
+            currentReportViewerId = id;
             currentReportImageIndex = index;
             resetZoom();
-            
-            let title = '';
-            if (isExam) {
-                const unit = syllabus.find(u => u.id === id);
-                title = `Evidencia de: ${unit.title}`;
-            } else {
-                const practice = labPractices.find(p => p.id === id);
-                title = `Reporte de: ${practice.name}`;
-            }
-            document.getElementById('report-viewer-title').innerText = title;
-
             updateReportViewerDisplay();
+            
             const modal = document.getElementById('report-viewer-modal');
             modal.classList.remove('hidden');
             setTimeout(() => {
@@ -1225,7 +1277,17 @@
         }
 
         function navigateReportViewer(direction) {
-            const images = appData.labReports[currentReportPracticeId] || [];
+            const id = currentReportViewerId;
+            let images;
+            if (id.startsWith('u')) {
+                images = [appData.examData[id].photo];
+            } else if (id.startsWith('lp')) {
+                images = appData.labReports[id] || [];
+            } else {
+                 const activity = appData.activities.find(a => a.id === id);
+                images = activity ? [activity.stamp] : [];
+            }
+
             const newIndex = currentReportImageIndex + direction;
             if (newIndex >= 0 && newIndex < images.length) {
                 currentReportImageIndex = newIndex;
@@ -1332,12 +1394,28 @@
             card.className = 'card p-4';
             const dueDate = new Date(mission.dueDate + 'T00:00:00');
             const formattedDate = dueDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
-            let actionButton = '';
+            
+            let statusButtonHTML = '';
             if (mission.status === 'pending') {
-                actionButton = `<button onclick="completeMission('${mission.id}')" class="bg-green-100 text-green-700 font-semibold py-2 px-4 rounded-full hover:bg-green-200 transition-colors text-sm">Completar</button>`;
+                statusButtonHTML = `<button onclick="completeMission('${mission.id}')" class="bg-green-100 text-green-700 font-semibold py-2 px-4 rounded-full hover:bg-green-200 transition-colors text-sm">Completar</button>`;
             } else {
-                actionButton = `<span class="text-green-500 font-bold text-sm">¡Lograda!</span>`;
+                statusButtonHTML = `<span class="text-green-500 font-bold text-sm">¡Lograda!</span>`;
             }
+
+            const controlButtonsHTML = `
+                <button onclick="editMission('${mission.id}')" class="text-gray-400 hover:text-purple-600 p-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
+                        <path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                <button onclick="deleteMission('${mission.id}')" class="text-gray-400 hover:text-red-600 p-1">
+                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+            `;
+
             const detailsHTML = isCompact ? '' : `
                 <div class="mt-4 pt-4 border-t border-gray-200 text-sm space-y-2 text-kirby-light-text">
                     <p><strong>🎯 Objetivo:</strong> ${mission.objective || 'No definido'}</p>
@@ -1356,7 +1434,10 @@
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
                             <span class="ml-1 font-bold">${mission.stars}</span>
                         </div>
-                        ${actionButton}
+                        <div class="flex items-center space-x-2">
+                           ${statusButtonHTML}
+                           ${controlButtonsHTML}
+                        </div>
                     </div>
                 </div>
                 ${detailsHTML}
@@ -1369,13 +1450,60 @@
 
         function completeMission(missionId) {
             const mission = appData.missions.find(m => m.id === missionId);
-            if (mission) {
+            if (mission && mission.status === 'pending') {
                 mission.status = 'completed';
+                const newEntry = {
+                    id: 'sv' + Date.now(),
+                    activity: `Misión: ${mission.desc}`,
+                    stars: mission.stars,
+                    date: new Date().toISOString()
+                };
+                appData.starVault.push(newEntry);
                 saveData();
                 updateAll();
             }
         }
         
+         function deleteMission(missionId) {
+            if (confirm('¿Estás seguro de que quieres eliminar esta misión?')) {
+                appData.missions = appData.missions.filter(m => m.id !== missionId);
+                saveData();
+                updateAll();
+            }
+        }
+        
+        function editMission(missionId) {
+            const mission = appData.missions.find(m => m.id === missionId);
+            if (!mission) return;
+
+            editingMissionId = missionId;
+
+            const missionSelect = document.getElementById('mission-select');
+            const customDescInput = document.getElementById('mission-custom-desc');
+            const customContainer = document.getElementById('custom-mission-container');
+
+            const isOptional = optionalMissions.find(om => om.text === mission.desc);
+            if (isOptional) {
+                missionSelect.value = isOptional.id;
+                customContainer.classList.add('hidden');
+                customDescInput.required = false;
+            } else {
+                missionSelect.value = 'custom';
+                customContainer.classList.remove('hidden');
+                customDescInput.value = mission.desc;
+                customDescInput.required = true;
+            }
+            
+            document.getElementById('mission-objective').value = mission.objective;
+            document.getElementById('mission-steps').value = mission.steps;
+            document.getElementById('mission-resources').value = mission.resources;
+            document.getElementById('mission-stars').value = mission.stars;
+            document.getElementById('mission-due-date').value = mission.dueDate;
+
+            document.getElementById('mission-submit-btn').innerText = "Guardar Cambios";
+            document.getElementById('mission-planner-card').scrollIntoView();
+        }
+
         function downloadMissionPDF(missionId) {
             const mission = appData.missions.find(m => m.id === missionId);
             if (!mission) return;
@@ -1487,6 +1615,7 @@
             renderStarVault();
             renderLabPractices();
             renderExams();
+            renderActivities();
             updateProgress();
             updateStars();
             updateVaultSummary();
@@ -1516,28 +1645,113 @@
         }
         
         // --- EVENT LISTENERS & INITIALIZATION ---
+        document.getElementById('add-activity-btn').addEventListener('click', addActivity);
+
+        document.getElementById('activities-container').addEventListener('input', (e) => {
+            const card = e.target.closest('.card');
+            if (!card) return;
+            const activityId = card.dataset.id;
+            const activity = appData.activities.find(a => a.id === activityId);
+            if (!activity) return;
+
+            if (e.target.classList.contains('activity-name')) {
+                activity.name = e.target.value;
+            } else if (e.target.classList.contains('activity-date')) {
+                activity.date = e.target.value;
+            } else if (e.target.classList.contains('activity-notes')) {
+                activity.notes = e.target.value;
+            }
+            saveData();
+        });
+
+        document.getElementById('activities-container').addEventListener('change', (e) => {
+             if (e.target.classList.contains('activity-stamp-upload')) {
+                const card = e.target.closest('.card');
+                const activityId = card.dataset.id;
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const activity = appData.activities.find(a => a.id === activityId);
+                        if (activity) {
+                            activity.stamp = event.target.result;
+                            saveData();
+                            renderActivities();
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                }
+             }
+        });
+
+         document.getElementById('activities-container').addEventListener('click', (e) => {
+            const card = e.target.closest('.card');
+            if (!card) return;
+            const activityId = card.dataset.id;
+            const activity = appData.activities.find(a => a.id === activityId);
+
+            if (e.target.classList.contains('delete-activity')) {
+                if (confirm('¿Estás seguro de que quieres eliminar esta actividad?')) {
+                    appData.activities = appData.activities.filter(a => a.id !== activityId);
+                    saveData();
+                    renderActivities();
+                }
+            } else if (e.target.classList.contains('remove-activity-stamp')) {
+                 if(activity) {
+                    activity.stamp = '';
+                    saveData();
+                    renderActivities();
+                 }
+            } else if (e.target.classList.contains('download-activity-pdf')) {
+                downloadActivityPdf(activityId);
+            } else if (e.target.closest('.activity-stamp-viewer')) {
+                if(activity && activity.stamp) {
+                    openReportViewer(activityId);
+                }
+            }
+        });
+
+
         document.getElementById('mission-form').addEventListener('submit', function(e) {
             e.preventDefault();
             const missionSelect = document.getElementById('mission-select');
             const customDescInput = document.getElementById('mission-custom-desc');
+            const submitBtn = document.getElementById('mission-submit-btn');
+
             let missionDescText = '';
             if (missionSelect.value === 'custom') {
                 missionDescText = customDescInput.value.trim();
             } else {
                 missionDescText = missionSelect.options[missionSelect.selectedIndex].text;
             }
+
             if (!missionDescText) return;
-            const newMission = {
-                id: 'm' + Date.now(),
+            
+            const missionData = {
                 desc: missionDescText,
                 objective: document.getElementById('mission-objective').value.trim(),
                 steps: document.getElementById('mission-steps').value.trim(),
                 resources: document.getElementById('mission-resources').value.trim(),
                 stars: parseInt(document.getElementById('mission-stars').value),
                 dueDate: document.getElementById('mission-due-date').value,
-                status: 'pending'
             };
-            appData.missions.push(newMission);
+
+            if (editingMissionId) {
+                const mission = appData.missions.find(m => m.id === editingMissionId);
+                if (mission) {
+                    Object.assign(mission, missionData);
+                }
+                editingMissionId = null;
+                submitBtn.innerText = '¡Añadir Misión!';
+            } else {
+                const newMission = {
+                    ...missionData,
+                    id: 'm' + Date.now(),
+                    status: 'pending'
+                };
+                appData.missions.push(newMission);
+            }
+            
             saveData();
             renderMissions();
             this.reset();
