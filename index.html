@@ -920,7 +920,7 @@
                          <p class="text-xs font-semibold mb-2" style="text-shadow: none; filter: none; color: var(--kirby-dark-text);">Nivel Alcanzado</p>
                         ${levelPdf ? `
                             <div class="bg-green-100 text-green-800 text-sm font-bold p-2 rounded-full">Nivel Validado</div>
-                             <a href="${levelPdf}" target="_blank" class="mt-2 inline-block text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full hover:bg-blue-200">Ver Comprobante</a>
+                             <a href="${levelPdf}" download="Comprobante_Practica_${practice.name.replace(/ /g, '_')}.pdf" class="mt-2 inline-block text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full hover:bg-blue-200">Ver Comprobante</a>
                              <button onclick="removeLevelPdf('${practice.id}')" class="mt-2 text-xs text-red-500 hover:underline">Quitar</button>
                         ` : `
                             <label for="level-pdf-upload-${practice.id}" class="cursor-pointer w-full text-xs bg-purple-400 text-white px-3 py-2 rounded-full hover:bg-purple-500 inline-block">
@@ -1043,7 +1043,7 @@
                          <p class="text-xs font-semibold mb-2" style="text-shadow: none; filter: none; color: var(--kirby-dark-text);">Calificación Validada</p>
                         ${validatedPdf ? `
                             <div class="bg-green-100 text-green-800 text-sm font-bold p-2 rounded-full">Calificación Validada</div>
-                            <a href="${validatedPdf}" target="_blank" class="mt-2 inline-block text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full hover:bg-blue-200">Ver Comprobante</a>
+                            <a href="${validatedPdf}" download="Comprobante_Examen_${unit.id}.pdf" class="mt-2 inline-block text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full hover:bg-blue-200">Ver Comprobante</a>
                             <button onclick="removeExamPdf('${unit.id}')" class="mt-2 text-xs text-red-500 hover:underline">Quitar</button>
                         ` : `
                             <label for="exam-pdf-upload-${unit.id}" class="cursor-pointer w-full text-xs bg-purple-400 text-white px-3 py-2 rounded-full hover:bg-purple-500 inline-block">
